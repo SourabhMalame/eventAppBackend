@@ -5,7 +5,7 @@ const Email = require("../utils/email");
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const NodeCache = require('node-cache');
-const nodeCache = new NodeCache();
+const nodeCache = new NodeCache()
 
 
 const signToken = (id) =>
