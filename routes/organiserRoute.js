@@ -4,8 +4,6 @@ const accountController = require("../controllers/accountController");
 
 const router = express.Router({ mergeParams: true });
 
-router.use(accountController.protect);
-
 router.route("/createOrganiser").post(organiserController.createOrganiser);
 
 router.route("/updateOrganiser/:id").patch(organiserController.updateData);

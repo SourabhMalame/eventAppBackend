@@ -1,62 +1,62 @@
-const mongoose = require("mongoose");
-const validator = require("validator");
+const mongoose = require('mongoose');
 
-const organizerSchema = new mongoose.Schema({
-  fullName: {
-    type: String,
-    required: [true, "Please enter fullname"],
-  },
-  email: {
-    type: String,
-    required: [true, "Please enter email"],
-    unique: true,
-    validate: {
-      validator: (value) => validator.isEmail(value),
-      message: "Please enter valid email",
+// Define the organiser schema
+const organiserSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: [true, 'An organiser must have a name'],
+        trim: true,
     },
-  },
-  address: {
-    type: String,
-    required: [true, "Please enter address"],
-  },
-  phone: {
-    type: String,
-    required: [true, "Please enter phone number"],
-    validate: {
-      validator: (value) => validator.isMobilePhone(value, "en-IN"),
-      message: "Please enter valid phone number",
+    email: {
+        type: String,
+        required: [true, 'An organiser must have an email'],
+        unique: true,
+        trim: true,
+        lowercase: true,
     },
-  },
-  panCard: {
-    type: String,
-    required: [true, "Please enter pan card number"],
-    validate: {
-      validator: (value) => /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(value),
-      message: "Please enter a valid PAN card number",
+    phone: {
+        type: String,
+        required: [true, 'An organiser must have a phone number'],
+        trim: true,
     },
-  },
-  adharCard: {
-    type: String,
-    required: [true, "Please enter adhar card number"],
-    validate: {
-      validator: (value) => validator.isNumeric(value) && value.length === 12,
-      message: "Please enter a valid Aadhar card number",
+    address: {
+        type: String,
+        required: [true, 'An organiser must have an address'],
+        trim: true,
     },
-  },
-  socialMedia: {
-    type: [String],
-    required: [true, "Please link at least one social media"],
-    validate: {
-      validator: (value) => value.length > 0,
-      message: "Please link at least one social media",
+    website: {
+        type: String,
+        trim: true,
     },
-  },
-  organiserType: {
-    type: String,
-    required: [true, "Please select oraniser type"],
-  },
+    socialLinks: {
+        facebook: {
+            type: String,
+            trim: true,
+        },
+        twitter: {
+            type: String,
+            trim: true,
+        },
+        instagram: {
+            type: String,
+            trim: true,
+        },
+    },
+    accountId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Account',
+        required: [true, 'An organiser must be linked to an account'],
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now,
+    },
 });
 
-const Organizer = mongoose.model("Organizer", organizerSchema);
+// Create an index for efficient querying
+organiserSchema.index({ name: 1, email: 1 });
 
-module.exports = Organizer;
+// Create and export the model
+const Organiser = mongoose.model('Organiser', organiserSchema);
+
+module.exports = Organiser;

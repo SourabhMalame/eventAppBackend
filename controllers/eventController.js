@@ -1,437 +1,184 @@
-const Event = require("../models/eventModel");
-const NodeCache = require('node-cache');
-const nodeCache = new NodeCache();
+const Event = require('../models/eventModel');
+const { ObjectId } = require('mongoose').Types;
 
-exports.createEvent = async (req, res, next) => {
-  const event = await Event.create(req.body);
-
-  if (!event) {
-    res.status(404).json({
-      status: "Error",
-      message: "Not able to create event",
-    });
-  }
-
-  res.status(200).json({
-    status: "success",
-    data: event,
-  });
-};
-
-exports.getAllEvent = async (req, res, next) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 21;
-    const keyword = req.query.keyword || '';
-    const category = req.query.category || 'all';
-    const skip = (page - 1) * limit;
-
-   // console.log(`Page: ${page}, Limit: ${limit}, Keyword: ${keyword}, Category: ${category}`);
-
-    let filter = {};
-    switch (category.toLowerCase()) {
-      case "location":
-        filter = { location: { $regex: keyword, $options: "i" } };
-        break;
-      case "699":
-        filter = { ticketprice: { $lte: parseInt(keyword) } }; // Use keyword instead of category for price
-        break;
-      case "adventure":
-      case "events":
-      case "plays":
-      case "sports":
-      case "activities":
-        filter = { eventType: category }; // Use category for eventType
-        break;
-      case "all":
-      default:
-        break;
-    }
-
-    // Create a unique cache key based on query parameters
-    const cacheKey = `events_${page}_${limit}_${keyword}_${category}`;
-    const cachedData = nodeCache.get(cacheKey);
-
-    if (cachedData) {
-      return res.status(200).json({
-        status: "success From NodeCache",
-        length: JSON.parse(cachedData).length,
-        page,
-        totalPages: Math.ceil(JSON.parse(cachedData).length / limit),
-        data: JSON.parse(cachedData)
-      });
-    }
-
-    const [events, totalCount] = await Promise.all([
-      Event.find(filter).skip(skip).limit(limit),
-      Event.countDocuments(filter)
-    ]);
-
-    if (!events || events.length === 0) {
-      return res.status(404).json({
-        status: "error",
-        message: "No events found",
-      });
-    }
-
-    const totalPages = Math.ceil(totalCount / limit);
-
-    // Cache the result
-    nodeCache.set(cacheKey, JSON.stringify(events), 600);
-
-    res.status(200).json({
-      status: "success",
-      length: events.length,
-      page,
-      totalPages,
-      data: events
-    });
-
-  } catch (err) {
-    console.error('Error retrieving events:', err);
-    res.status(500).json({
-      status: "error",
-      message: "Failed to retrieve events",
-      reason: err.message,
-    });
-  }
-};
-
-exports.getEvent = async (req, res, next) => {
-  const { eventId } = req.params;
-  const id = eventId.split("=")[1];
-
-  const cacheKey = `event_${id}`;
-  const cachedData = nodeCache.get(cacheKey);
-
-  if (cachedData) {
-    return res.status(200).json({
-      status: "success From NodeCache",
-      message: "Data Fetched Successfully",
-      data: JSON.parse(cachedData),
-    });
-  }
-
-  try {
-    const event = await Event.findById(id);
-    if (!event) {
-      return res.status(404).json({
-        status: "Error",
-        message: "Error while fetching info",
-      });
-    }
-
-    nodeCache.set(cacheKey, JSON.stringify(event), 600); // TTL in seconds
-
-    res.status(200).json({
-      status: "success",
-      message: "Data Fetched Successfully",
-      data: event,
-    });
-  } catch (err) {
-    console.error('Error retrieving event:', err);
-    res.status(500).json({
-      status: "error",
-      message: "Failed to retrieve event",
-      reason: err.message,
-    });
-  }
-};
-
-exports.getEventParticular = async function (req, res, next) {
-  const { location, keyword } = req.params;
-  const cacheKey = `eventParticular_${location}_${keyword}`;
-  const cachedData = nodeCache.get(cacheKey);
-
-  if (cachedData) {
-    return res.status(200).json({
-      status: "success From NodeCache",
-      message: "Data Fetched Successfully",
-      data: JSON.parse(cachedData),
-    });
-  }
-
-  try {
-    const event = await Event.find({
-      $and: [
-        { location: { $regex: location, $options: "i" } },
-        { description: { $regex: keyword, $options: "i" } },
-      ],
-    });
-
-    if (!event) {
-      return res.status(404).json({
-        status: "Error",
-        message: "Error while fetching info",
-      });
-    }
-
-    nodeCache.set(cacheKey, JSON.stringify(event), 600); // TTL in seconds
-
-    res.status(200).json({
-      status: "success",
-      message: "Data Fetched Successfully",
-      data: event,
-    });
-  } catch (err) {
-    console.error('Error retrieving event:', err);
-    res.status(500).json({
-      status: "error",
-      message: "Failed to retrieve event",
-      reason: err.message,
-    });
-  }
-};
-
-exports.getEventsbyLocation = async function (req, res, next) {
-  const { eventlocation } = req.params;
-  const cacheKey = `eventsByLocation_${eventlocation}`;
-  const cachedData = nodeCache.get(cacheKey);
-
-  if (cachedData) {
-    return res.status(200).json({
-      status: "success From NodeCache",
-      message: "Data Fetched Successfully",
-      data: JSON.parse(cachedData),
-    });
-  }
-
-  try {
-    const event = await Event.find({
-      Categories: { $regex: eventlocation, $options: "i" },
-    });
-
-    if (!event) {
-      return res.status(404).json({
-        status: "Error",
-        message: "Error while fetching info",
-      });
-    }
-
-    nodeCache.set(cacheKey, JSON.stringify(event), 600); // TTL in seconds
-
-    res.status(200).json({
-      status: "success",
-      message: "Data Fetched Successfully",
-      data: event,
-    });
-  } catch (err) {
-    console.error('Error retrieving events by location:', err);
-    res.status(500).json({
-      status: "error",
-      message: "Failed to retrieve events",
-      reason: err.message,
-    });
-  }
-};
-
-exports.getEventsbyPrice = async function (req, res, next) {
-  try {
-    const { eventPrice } = req.params;
-    const price = parseInt(eventPrice, 10);
-    if (isNaN(price)) {
-      return res.status(400).json({
-        status: "Error",
-        message: "Invalid price parameter",
-      });
-    }
-
-    const cacheKey = `eventsByPrice_${price}`;
-    const cachedData = nodeCache.get(cacheKey);
-
-    if (cachedData) {
-      return res.status(200).json({
-        status: "success From NodeCache",
-        message: "Data Fetched Successfully",
-        length: JSON.parse(cachedData).length,
-        data: JSON.parse(cachedData),
-      });
-    }
-
-    const events = await Event.find({
-      ticketprice: { $lte: price },
-    });
-
-    if (events.length === 0) {
-      return res.status(404).json({
-        status: "Error",
-        message: "No events found within the specified price range",
-      });
-    }
-
-    nodeCache.set(cacheKey, JSON.stringify(events), 600); // TTL in seconds
-
-    res.status(200).json({
-      status: "success",
-      message: "Data Fetched Successfully",
-      length: events.length,
-      data: events,
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: "Error",
-      message: "Error while fetching info",
-      error: error.message,
-    });
-  }
-};
-
-exports.getEventsByProps = async function (req, res, next) {
-  const { propsKeyword } = req.params;
-  const { category } = req.query;
-  const cacheKey = `eventsByProps_${propsKeyword}_${category}`;
-  const cachedData = nodeCache.get(cacheKey);
-
-  if (cachedData) {
-    return res.status(200).json({
-      status: "success From NodeCache",
-      message: "Data Fetched Successfully",
-      data: JSON.parse(cachedData),
-    });
-  }
-
-  try {
-    let event = [];
-    switch (category) {
-      case "location":
-        event = await Event.find({
-          location: { $regex: propsKeyword, $options: "i" },
+// Controller to create a new event
+exports.createEvent = async (req, res) => {
+    try {
+        const newEvent = await Event.create(req.body);
+        res.status(201).json({
+            status: 'success',
+            data: {
+                event: newEvent,
+            },
         });
-        break;
-      case "699":
-        event = await Event.find({
-          ticketprice: { $lte: parseInt(propsKeyword) },
+    } catch (error) {
+        res.status(500).json({
+            status: 'fail',
+            message: error.message,
         });
-        break;
-      case "all":
-        event = await Event.find().skip(0).limit(15);
-        break;
-      case "Adventure":
-        event = await Event.find({
-          eventType: propsKeyword,
+    }
+};
+
+// Controller to get all events
+exports.getAllEvent = async (req, res) => {
+    try {
+        const events = await Event.find();
+        res.status(200).json({
+            status: 'success',
+            data: {
+                events,
+            },
         });
-        break;
+    } catch (error) {
+        res.status(500).json({
+            status: 'fail',
+            message: error.message,
+        });
     }
-
-    if (!event) {
-      return res.status(404).json({
-        status: "Error",
-        message: "Error while fetching info",
-      });
-    }
-
-    nodeCache.set(cacheKey, JSON.stringify(event), 600); // TTL in seconds
-
-    res.status(200).json({
-      status: "success",
-      message: "Data Fetched Successfully",
-      data: event,
-    });
-  } catch (err) {
-    console.error('Error retrieving events by props:', err);
-    res.status(500).json({
-      status: "error",
-      message: "Failed to retrieve events",
-      reason: err.message,
-    });
-  }
 };
 
-exports.getAllEventTypes = async function (req, res, next) {
-  const EventTypes = await Event.distinct("eventType");
-  if (!EventTypes) {
-    return res.status(400).json({
-      status: "Error",
-      message: "Error While Fetching info",
-    });
-  }
-
-  res.status(200).json({
-    status: "success",
-    message: "Data Fetched Successfully",
-    data: EventTypes,
-  });
-};
-
-exports.getAllEventIds = async function (req, res, next) {
-  const cacheKey = 'allEventIds';
-  const cachedData = nodeCache.get(cacheKey);
-
-  if (cachedData) {
-    return res.status(200).json({
-      status: "success From NodeCache",
-      message: "Data Fetched Successfully",
-      data: JSON.parse(cachedData),
-    });
-  }
-
-  try {
-    const EventIds = await Event.find({}, { _id: 1 });
-    if (!EventIds || EventIds.length === 0) {
-      return res.status(404).json({
-        status: "Error",
-        message: "No events found",
-      });
+// Controller to get a single event by its ID
+exports.getEvent = async (req, res) => {
+    try {
+        const event = await Event.findById(req.params.eventId);
+        if (!event) {
+            return res.status(404).json({
+                status: 'fail',
+                message: 'No event found with that ID',
+            });
+        }
+        res.status(200).json({
+            status: 'success',
+            data: {
+                event,
+            },
+        });
+    } catch (error) {
+        res.status(500).json({
+            status: 'fail',
+            message: error.message,
+        });
     }
-
-    // Cache the result with a TTL of 600 seconds (10 minutes)
-    nodeCache.set(cacheKey, JSON.stringify(EventIds), 600);
-
-    res.status(200).json({
-      status: "success",
-      message: "Data Fetched Successfully",
-      data: EventIds,
-    });
-  } catch (err) {
-    console.error('Error retrieving event IDs:', err);
-    res.status(500).json({
-      status: "Error",
-      message: "Error While Fetching info",
-      reason: err.message,
-    });
-  }
 };
 
-exports.getEventbyEventId = async function (req, res, next) {
-  const { evtId } = req.params;
-  const cacheKey = `event_${evtId}`;
-
-  // Check if data is cached
-  const cachedData = nodeCache.get(cacheKey);
-  if (cachedData) {
-    return res.status(200).json({
-      status: "success From NodeCache",
-      data: JSON.parse(cachedData),
-    });
-  }
-
-  try {
-    // Fetch data from database
-    const event = await Event.findById(evtId);
-    if (!event) {
-      return res.status(404).json({
-        status: "error",
-        message: "Event not found",
-      });
+// Controller to get events by location and keyword
+exports.getEventParticular = async (req, res) => {
+    try {
+        const { location, keyword } = req.params;
+        const events = await Event.find({
+            location: { $regex: location, $options: 'i' },
+            title: { $regex: keyword, $options: 'i' },
+        });
+        res.status(200).json({
+            status: 'success',
+            data: {
+                events,
+            },
+        });
+    } catch (error) {
+        res.status(500).json({
+            status: 'fail',
+            message: error.message,
+        });
     }
-
-    // Cache the result with a TTL of 600 seconds (10 minutes)
-    nodeCache.set(cacheKey, JSON.stringify(event), 600);
-
-    res.status(200).json({
-      status: "success",
-      data: event,
-    });
-  } catch (err) {
-    console.error('Error retrieving event by ID:', err);
-    res.status(500).json({
-      status: "error",
-      message: "Failed to retrieve event",
-      reason: err.message,
-    });
-  }
 };
 
+// Controller to get events by price
+exports.getEventsbyPrice = async (req, res) => {
+    try {
+        const eventPrice = req.params.eventPrice;
+        const events = await Event.find({ price: eventPrice });
+        res.status(200).json({
+            status: 'success',
+            data: {
+                events,
+            },
+        });
+    } catch (error) {
+        res.status(500).json({
+            status: 'fail',
+            message: error.message,
+        });
+    }
+};
 
+// Controller to get events by properties keyword
+exports.getEventsByProps = async (req, res) => {
+    try {
+        const propsKeyword = req.params.propsKeyword;
+        const events = await Event.find({
+            properties: { $regex: propsKeyword, $options: 'i' },
+        });
+        res.status(200).json({
+            status: 'success',
+            data: {
+                events,
+            },
+        });
+    } catch (error) {
+        res.status(500).json({
+            status: 'fail',
+            message: error.message,
+        });
+    }
+};
 
+// Controller to get all event types
+exports.getAllEventTypes = async (req, res) => {
+    try {
+        const eventTypes = await Event.distinct('type');
+        res.status(200).json({
+            status: 'success',
+            data: {
+                eventTypes,
+            },
+        });
+    } catch (error) {
+        res.status(500).json({
+            status: 'fail',
+            message: error.message,
+        });
+    }
+};
 
+// Controller to get all event IDs
+exports.getAllEventIds = async (req, res) => {
+    try {
+        const eventIds = await Event.find().select('_id');
+        res.status(200).json({
+            status: 'success',
+            data: {
+                eventIds,
+            },
+        });
+    } catch (error) {
+        res.status(500).json({
+            status: 'fail',
+            message: error.message,
+        });
+    }
+};
+
+// Controller to get event by eventId
+exports.getEventbyEventId = async (req, res) => {
+    try {
+        const event = await Event.findOne({ eventId: req.params.evtId });
+        if (!event) {
+            return res.status(404).json({
+                status: 'fail',
+                message: 'No event found with that eventId',
+            });
+        }
+        res.status(200).json({
+            status: 'success',
+            data: {
+                event,
+            },
+        });
+    } catch (error) {
+        res.status(500).json({
+            status: 'fail',
+            message: error.message,
+        });
+    }
+};
